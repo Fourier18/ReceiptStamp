@@ -1,0 +1,4 @@
+keys/private.pem
+node_modules/
+.wrangler/
+.claude/

@@ -1,0 +1,12 @@
+name = "receiptstamp"
+main = "src/worker.mjs"
+compatibility_date = "2026-07-02"
+compatibility_flags = ["nodejs_compat"]
+
+# RECEIPTSTAMP_PUBLIC_KEY_PEM is safe as a plain var (public by definition).
+[vars]
+RECEIPTSTAMP_PUBLIC_KEY_PEM = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA31U0+J0XDDCIeC0hVXPa2MtOK+kywJwZvaKG9lFclJk=\n-----END PUBLIC KEY-----\n"
+
+# RECEIPTSTAMP_PRIVATE_KEY_PEM must be set via:
+#   npx wrangler secret put RECEIPTSTAMP_PRIVATE_KEY_PEM
+# Never put the private key in this file or in [vars].
