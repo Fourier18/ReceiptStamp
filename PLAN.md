@@ -56,16 +56,32 @@ attachment doesn't keep this alive past the point the market has answered.
   rest of the project is CommonJS). Keys read from `env` bindings, not the
   filesystem. `test/test-worker.js`, 7/7 pass locally against the same code.
 
-**Not done — deliberately paused, each needs your go-ahead first:**
-- Agent wallet creation (non-custodial — we'd hold the key) — required by
-  both ACP and Bazaar. See RAILS.md for the full requirements comparison.
-- CDP (Coinbase developer) account — Bazaar only.
-- Actually listing/selling anywhere — explicit-permission actions.
+**LISTED ON VIRTUALS ACP (2026-07-02) — the kill-criterion clock is running:**
+- ACP agent "ReceiptStamp", created under the panmediatechnologygroup@gmail.com
+  Virtuals account (same Google identity as the Cloudflare account — one
+  identity owns the whole operation, deliberate choice).
+- Wallet: `0x7e05d79f914fdac136812af82d304e8272b3dc20` (non-custodial; signer
+  key in this machine's Windows keychain, `restricted` policy — auto-signs ACP
+  transactions only, everything else needs manual approval).
+- Agent email identity: `receiptstamp_gaon@agents.world` (auto-provisioned).
+- Registered on-chain: ERC-8004 on Base (chain 8453).
+- Offering `019f253b-fd4c-72c5-acb6-ecbef264b04e`: fixed $0.02/call, 5-min
+  SLA, visible, JSON-schema'd requirements (`{payload}`) and deliverable
+  (`{receipt}`).
+- `src/acp-provider.js` — the servicing daemon: keeps `acp events listen`
+  alive, polls/drains events + sweeps `acp job list`, and on a funded job
+  calls the live Worker `/stamp` then `acp provider submit`s the receipt.
+  Currently running in this session; survives listener crashes.
 
-## Next step, when you're ready
-Rails research done — see RAILS.md. Recommended order: list on **Virtuals
-ACP first** (the one venue with verified agent-to-agent job volume plus a
-$1M/mo seller revenue pool), x402 Bazaar second (near-zero marginal cost —
-it auto-lists on first settled payment). The four decisions that are yours
-are tabled at the bottom of RAILS.md. Nothing gets deployed or listed
-without a specific go-ahead for each account/wallet creation.
+**Operational constraints to know:**
+- The provider daemon MUST run on this machine (the ACP signer key lives in
+  the Windows keychain — submissions can only be signed here). Machine off =
+  jobs miss the 5-min SLA. If real volume ever appears, revisit hosting the
+  signer (Privy-managed SDK) so servicing isn't tied to a desktop being awake.
+- **Kill criterion active: zero paid ACP jobs by 2026-07-16 = kill this rail.**
+
+**Not done — each needs a go-ahead first:**
+- x402 Bazaar listing (needs CDP account + x402 SDK wrapper on the Worker).
+  Near-zero marginal cost — the free second shelf once ACP is proven/failed.
+- Exchange account for USDC→USD cash-out — only matters once real earnings
+  exist in the wallet.
