@@ -69,38 +69,45 @@ attachment doesn't keep this alive past the point the market has answered.
   SLA, visible, JSON-schema'd requirements (`{payload}`) and deliverable
   (`{receipt}`).
 
-**Cloud servicing daemon (2026-07-02) — replaces the machine-bound provider:**
+**Cloud servicing daemon — LIVE on Railway (2026-07-03), fully machine-independent:**
 - Standing rule (from Joshua, forcefully): every runtime component must work
   with his machine OFF. "Runs on this desktop" is never a deliverable. The
   first provider daemon (`acp-provider.js`, CLI + Windows-keychain signer)
-  violated that and was deleted.
-- `src/acp-daemon.mjs` — rewritten on `@virtuals-protocol/acp-node-v2`
+  violated that and was deleted. See memory `cloud-first-autonomy`.
+- `src/acp-daemon.mjs` — built on `@virtuals-protocol/acp-node-v2`
   (event-driven SDK: requirement → setBudget; job.funded → Worker `/stamp` →
-  session.submit; heartbeat log every 10 min). The signer key is an env
-  secret, not a keychain — runs on any Node ≥20 host. `npm start` runs it.
+  session.submit; heartbeat log every 10 min).
+- Deployed on **Railway** (project `pleasant-delight`, service `ReceiptStamp`,
+  auto-deploys from `Fourier18/ReceiptStamp` master). Usage capped: $10
+  Compute hard limit / $8 email alert (Railway's separate "Agent" usage limit
+  is their own AI assistant feature, unrelated to this daemon — left at
+  default). Confirmed running: logs show "ReceiptStamp provider online —
+  stamping via https://receiptstamp.panmediatech.workers.dev/stamp, price
+  $0.02" (2026-07-03T00:42:53Z).
+- **Second signer** `RecStamp002` created via the dashboard's "+ Add Key" (the
+  CLI-generated signer's key is keychain-locked, non-exportable — a fresh key
+  was required for a server-side/env-var signer). Policy: **Virtuals Only**
+  (auto-authorizes ACP/tokenisation transactions, same semantics as the CLI
+  signer's `restricted`). Its raw private key lives only in Railway's
+  `ACP_SIGNER_PRIVATE_KEY` env var — never committed, never pasted in chat.
+- Env vars set on Railway: `ACP_WALLET_ADDRESS`
+  (0x7e05d79f914fdac136812af82d304e8272b3dc20), `ACP_WALLET_ID`
+  (x1zd1uqfbtzj9mycdxr1e0hm), `ACP_SIGNER_PRIVATE_KEY` (RecStamp002's key).
+  `ACP_BUILDER_CODE` not set (optional, skipped).
 - Architecture split: Cloudflare Worker keeps the Ed25519 notary key and does
-  all stamping; the daemon only services ACP job flow. Two secrets, two homes,
-  neither on the desktop.
-- Hosting decision (made, not yet executed): **Railway** (~$5/mo Hobby,
-  deploys from the GitHub repo, web log dashboard for check-ins). Workers
-  can't host this — the SDK needs a persistent SSE connection.
-
-**To go live in the cloud (single consolidated human step, then done):**
-1. Virtuals dashboard → agent ReceiptStamp → **Signers** tab → "+ Add Signer"
-   → Copy Key; note the `walletId` on the same page; optional `builderCode`
-   under Settings.
-2. Railway account (GitHub OAuth) → New Project → Deploy from
-   `Fourier18/ReceiptStamp` → set env vars: `ACP_WALLET_ADDRESS`
-   (0x7e05d79f914fdac136812af82d304e8272b3dc20), `ACP_WALLET_ID`,
-   `ACP_SIGNER_PRIVATE_KEY` (paste directly into Railway, never through
-   chat), optional `ACP_BUILDER_CODE`.
-3. Railway auto-runs `npm start`. Watch logs for "ReceiptStamp provider
-   online".
+  all stamping; the daemon only services ACP job flow. Two secrets, two
+  cloud homes, neither on the desktop.
+- Debugging note for next time: a signer added via the dashboard isn't live
+  until you click all the way through — "Copy Key" alone doesn't finish the
+  flow. First attempt looked done but Signers count stayed at 1, and Railway
+  failed with a generic `BaseError: Server error 500` from
+  `privyAlchemyEvmProviderAdapter.js` (unregistered signer key, server-side
+  rejection with no useful detail message). Confirm via the Wallet tab's
+  Signers count before trusting a "key generated" step is complete.
 
 **Operational constraints to know:**
 - The old CLI signer (Windows keychain) still exists and is fine for admin
-  commands (`acp offering …`) — but production job servicing must be the
-  cloud daemon.
+  commands (`acp offering …`) — production job servicing is the cloud daemon.
 - **Kill criterion active: zero paid ACP jobs by 2026-07-16 = kill this rail.**
 
 **Not done — each needs a go-ahead first:**
