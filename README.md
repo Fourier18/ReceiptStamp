@@ -37,8 +37,9 @@ the payload, Ed25519 signature over `{hash, timestamp}`, ISO-8601 timestamp.
 - [`src/worker.mjs`](src/worker.mjs) — Cloudflare Workers app (Hono); **deployed, live**. Serves `/stamp`, `/x402/stamp`, `/verify`, `/pubkey`
 - [`src/acp-daemon.mjs`](src/acp-daemon.mjs) — ACP marketplace seller daemon (`@virtuals-protocol/acp-node-v2`); **deployed on Railway, live**
 - [`keys/`](keys) — key generation script (`generate-keys.js`); the private key itself is gitignored, never committed
+- [`scripts/bootstrap-x402-payment.mjs`](scripts/bootstrap-x402-payment.mjs) — one-time script that pays `/x402/stamp` for real, from a wallet you provide via env var, to trigger Bazaar's first-settlement indexing requirement. Already run once (2026-07-03); not meant to run repeatedly.
 - [`test/`](test) — test suites for the core logic, the Node server, and the Worker (all 4 routes, both rails)
-- [`package.json`](package.json) — real dependencies: `@virtuals-protocol/acp-node-v2` (rail A's SDK), `hono` + `x402-hono` + `@coinbase/x402` (rail B's paywall + CDP facilitator)
+- [`package.json`](package.json) — real dependencies: `@virtuals-protocol/acp-node-v2` (rail A's SDK), `hono` + `x402-hono` + `@coinbase/x402` (rail B's paywall + CDP facilitator); dev-only: `x402-fetch` + `viem` (the bootstrap script's client)
 
 See [PLAN.md](PLAN.md) for the project rationale, kill criterion, and current
 status (this is the file to check for "where are things right now"), and

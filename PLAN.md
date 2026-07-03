@@ -146,14 +146,53 @@ attachment doesn't keep this alive past the point the market has answered.
   real payment challenge (`base` network, `20000` = $0.02 USDC, correct
   live `resource` URL).
 - Bazaar auto-cataloging happens on first *settled* payment (not just a
-  402 challenge) — typically indexed within ~10 minutes after that. Not
-  visible in Bazaar search yet since no real payment has occurred.
+  402 challenge) — typically indexed within ~10 minutes after that.
 - Gotcha for next time: the CDP dashboard's "Create secret API key" flow
   asks for an SSN and legal business name if you land on the wrong page —
   that's the *business/KYB* verification flow (for custodial APIs / holding
   customer funds), a completely different product from the plain developer
   API key we needed. If that SSN/business form appears, back out — go to
   portal.cdp.coinbase.com → API Keys tab directly instead.
+
+**Bootstrap payment — DONE (2026-07-03), Bazaar indexing triggered:**
+- Problem: Bazaar only catalogs a listing after its first *settled*
+  payment — a chicken-and-egg gap, since nobody could discover it via
+  Bazaar search until someone had already paid once some other way.
+- Fix: generated a fresh, dedicated, small-value EVM wallet locally
+  (`scripts/.bootstrap-wallet.key`, gitignored, never committed) —
+  deliberately NOT the ACP agent wallet's key, which is a Privy P256
+  authorization key, a different key type entirely from a standard EVM
+  wallet key and unusable with `x402-fetch`. Joshua funded the new wallet
+  (~$3 ETH + $1 USDC on Base, via Coinbase). `scripts/bootstrap-x402-payment.mjs`
+  (built on `x402-fetch`'s `wrapFetchWithPayment`, verified against the
+  installed package's actual type definitions) paid `/x402/stamp` for
+  real. **Confirmed settled on Base mainnet:**
+  tx `0xf70d779675a962986a6a2694714df994202e198bf0a2b366360f452c1afa2f02`,
+  payer `0xD87DbC7Bc6DaA3C03feae2d45C7e545cdb062813`, receipt correctly
+  signed and returned. Bazaar indexing should follow within ~10 minutes.
+- **Real bug found and fixed along the way:** the CDP secrets
+  (`CDP_API_KEY_ID` / `CDP_API_KEY_SECRET`) were silently corrupted to a
+  single control character (``) when pasted into `wrangler secret
+  put`'s interactive masked prompt in this machine's embedded terminal —
+  not a paste-content issue, a bug in how that specific terminal handles
+  paste into masked/password-style prompts. Confirmed via a temporary
+  debug log inside the Worker (logged only lengths/JSON-escaped values,
+  never printed in the clear) — this showed the *actual* runtime value
+  Cloudflare had, rather than guessing from the outside. **Fix: always set
+  secrets via file redirection** (`wrangler secret put NAME < file.txt`),
+  never the interactive prompt, on this machine. This means the earlier
+  "CDP account/secrets" step in this file was set correctly by procedure
+  but silently corrupted by this terminal bug — worth remembering this
+  class of failure (secret *exists* and *looks* right end-to-end, but its
+  actual content is wrong) the next time something authenticates
+  inexplicably.
+- Researched (2026-07-03) and decided **against** further Bazaar-adjacent
+  discovery work: x402scan.com requires its own separate discovery
+  protocol (`v2` field-naming, an `/openapi.json` document) that diverges
+  from what Coinbase's own `x402`/`@coinbase/x402` packages actually
+  output today — not worth the compatibility risk to the real paid route
+  for a scanner with unverified buyer traffic. PayAPI Market and
+  awesome-x402 GitHub lists are free/manual alternatives, not yet acted on.
 
 **Not done — needs a go-ahead first:**
 - Exchange account for USDC→USD cash-out — only matters once real earnings
