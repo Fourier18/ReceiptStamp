@@ -1,0 +1,23 @@
+{
+  "name": "receiptstamp",
+  "version": "1.0.0",
+  "description": "Stateless proof-of-execution notary: signed hash+timestamp receipts (Ed25519), sold as an agent service on Virtuals ACP.",
+  "main": "src/receiptstamp.js",
+  "scripts": {
+    "start": "node src/acp-daemon.mjs",
+    "test": "node test/test.js && node test/test-server.js && node test/test-worker.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fourier18/ReceiptStamp.git"
+  },
+  "license": "MIT",
+  "type": "commonjs",
+  "homepage": "https://github.com/Fourier18/ReceiptStamp#readme",
+  "dependencies": {
+    "@virtuals-protocol/acp-node-v2": "^0.1.7"
+  }
+}

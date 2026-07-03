@@ -68,16 +68,39 @@ attachment doesn't keep this alive past the point the market has answered.
 - Offering `019f253b-fd4c-72c5-acb6-ecbef264b04e`: fixed $0.02/call, 5-min
   SLA, visible, JSON-schema'd requirements (`{payload}`) and deliverable
   (`{receipt}`).
-- `src/acp-provider.js` — the servicing daemon: keeps `acp events listen`
-  alive, polls/drains events + sweeps `acp job list`, and on a funded job
-  calls the live Worker `/stamp` then `acp provider submit`s the receipt.
-  Currently running in this session; survives listener crashes.
+
+**Cloud servicing daemon (2026-07-02) — replaces the machine-bound provider:**
+- Standing rule (from Joshua, forcefully): every runtime component must work
+  with his machine OFF. "Runs on this desktop" is never a deliverable. The
+  first provider daemon (`acp-provider.js`, CLI + Windows-keychain signer)
+  violated that and was deleted.
+- `src/acp-daemon.mjs` — rewritten on `@virtuals-protocol/acp-node-v2`
+  (event-driven SDK: requirement → setBudget; job.funded → Worker `/stamp` →
+  session.submit; heartbeat log every 10 min). The signer key is an env
+  secret, not a keychain — runs on any Node ≥20 host. `npm start` runs it.
+- Architecture split: Cloudflare Worker keeps the Ed25519 notary key and does
+  all stamping; the daemon only services ACP job flow. Two secrets, two homes,
+  neither on the desktop.
+- Hosting decision (made, not yet executed): **Railway** (~$5/mo Hobby,
+  deploys from the GitHub repo, web log dashboard for check-ins). Workers
+  can't host this — the SDK needs a persistent SSE connection.
+
+**To go live in the cloud (single consolidated human step, then done):**
+1. Virtuals dashboard → agent ReceiptStamp → **Signers** tab → "+ Add Signer"
+   → Copy Key; note the `walletId` on the same page; optional `builderCode`
+   under Settings.
+2. Railway account (GitHub OAuth) → New Project → Deploy from
+   `Fourier18/ReceiptStamp` → set env vars: `ACP_WALLET_ADDRESS`
+   (0x7e05d79f914fdac136812af82d304e8272b3dc20), `ACP_WALLET_ID`,
+   `ACP_SIGNER_PRIVATE_KEY` (paste directly into Railway, never through
+   chat), optional `ACP_BUILDER_CODE`.
+3. Railway auto-runs `npm start`. Watch logs for "ReceiptStamp provider
+   online".
 
 **Operational constraints to know:**
-- The provider daemon MUST run on this machine (the ACP signer key lives in
-  the Windows keychain — submissions can only be signed here). Machine off =
-  jobs miss the 5-min SLA. If real volume ever appears, revisit hosting the
-  signer (Privy-managed SDK) so servicing isn't tied to a desktop being awake.
+- The old CLI signer (Windows keychain) still exists and is fine for admin
+  commands (`acp offering …`) — but production job servicing must be the
+  cloud daemon.
 - **Kill criterion active: zero paid ACP jobs by 2026-07-16 = kill this rail.**
 
 **Not done — each needs a go-ahead first:**
