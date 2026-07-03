@@ -10,15 +10,21 @@ let worker; // loaded via dynamic import() in main() — worker.mjs is an ES mod
 const env = {
   RECEIPTSTAMP_PRIVATE_KEY_PEM: readFileSync(path.join(__dirname, '../keys/private.pem'), 'utf8'),
   RECEIPTSTAMP_PUBLIC_KEY_PEM: readFileSync(path.join(__dirname, '../keys/public.pem'), 'utf8'),
+  // x402 route test only checks the 402 challenge is issued correctly —
+  // that doesn't require real CDP credentials, so these stay unset here.
+  X402_PAY_TO_ADDRESS: '0x7e05d79f914fdac136812af82d304e8272b3dc20',
 };
 
-function req(method, urlPath, body) {
+async function req(method, urlPath, body) {
   const request = new Request(`http://worker.local${urlPath}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  return worker.fetch(request, env, {}).then(async (r) => ({ status: r.status, body: await r.json() }));
+  // await, not .then() — Hono's fetch may return a Response directly rather
+  // than always a Promise; await handles both, .then() only handles one.
+  const r = await worker.fetch(request, env, { waitUntil: () => {}, passThroughOnException: () => {} });
+  return { status: r.status, body: await r.json() };
 }
 
 let failed = false;
@@ -49,6 +55,16 @@ async function main() {
   assert(badReceipt.status === 400, 'POST /verify with malformed receipt returns 400');
   const notFound = await req('GET', '/nope');
   assert(notFound.status === 404, 'unknown route returns 404');
+
+  // /stamp must stay free (unpaywalled) — the ACP daemon depends on this.
+  const stampStillFree = await req('POST', '/stamp', { payload });
+  assert(stampStillFree.status === 200 && stampStillFree.body.receipt, 'POST /stamp remains unpaywalled for the ACP daemon');
+
+  // /x402/stamp must demand payment — no CDP credentials needed to reach the 402 challenge itself.
+  const x402Challenge = await req('POST', '/x402/stamp', { payload });
+  assert(x402Challenge.status === 402 && Array.isArray(x402Challenge.body.accepts), 'POST /x402/stamp without payment returns a 402 challenge');
+  const accepted = x402Challenge.body.accepts && x402Challenge.body.accepts[0];
+  assert(accepted && accepted.network === 'base' && accepted.maxAmountRequired === '20000', 'x402 challenge specifies base mainnet and $0.02 USDC (20000 = 6-decimal units)');
 
   console.log(failed ? '\nSOME WORKER TESTS FAILED' : '\nALL WORKER TESTS PASSED');
   process.exitCode = failed ? 1 : 0;

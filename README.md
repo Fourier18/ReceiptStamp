@@ -7,22 +7,25 @@ exact time — without trusting the agent's own word for it.
 
 Live: https://receiptstamp.panmediatech.workers.dev
 Selling on: [Virtuals ACP](https://app.virtuals.io/acp/agents/019f2535-118d-7d76-a9bf-3ce023c0bffb) — $0.02/receipt, 5-min SLA
+Selling on: x402 Bazaar — $0.02/receipt, Base mainnet (code done; goes live once a CDP account is set up, see [PLAN.md](PLAN.md))
 
 ## How this fits together
 
-One idea, exposed two ways, plus one piece that gets paid:
+One idea, exposed two ways, plus two separate ways it gets paid:
 
 1. **The idea** — [`src/receiptstamp.js`](src/receiptstamp.js): take some text, produce a signed proof it existed at a given time. That's the whole product.
 2. **Exposure #1 — the API** — [`src/worker.mjs`](src/worker.mjs), deployed on Cloudflare Workers (the live URL above). This is what actually runs `stamp()`/`verify()` on the internet. [`src/server.js`](src/server.js) is the same thing but for running on a plain computer, local-dev only.
-3. **Exposure #2 — getting paid** — [`src/acp-daemon.mjs`](src/acp-daemon.mjs), deployed on Railway. Watches the ACP marketplace for buyers, holds their payment in escrow, calls the Worker above to produce the receipt, delivers it, releases the payment. Runs continuously, independent of any developer machine.
+3. **Exposure #2 — getting paid, rail A (ACP)** — [`src/acp-daemon.mjs`](src/acp-daemon.mjs), deployed on Railway. Watches the ACP marketplace for buyers, holds their payment in escrow, calls the Worker's `/stamp` route to produce the receipt, delivers it, releases the payment. Runs continuously, independent of any developer machine.
+4. **Exposure #2 — getting paid, rail B (x402 Bazaar)** — no separate daemon needed for this one. It's built directly into the Worker: `/x402/stamp` demands a real on-chain USDC micropayment (via Coinbase's CDP facilitator) before it will run `stamp()`. `/stamp` (used by rail A) stays completely separate and free at the Worker level on purpose — see the note in `worker.mjs` if you're ever tempted to merge them, it would break rail A.
 
-Everything else supports those three: [`test/`](test) proves each piece still works after a change, [`keys/`](keys) holds the notary's signing identity (private key never committed), [`PLAN.md`](PLAN.md) is the running status/decision log, [`RAILS.md`](RAILS.md) is the marketplace research.
+Everything else supports those: [`test/`](test) proves each piece still works after a change, [`keys/`](keys) holds the notary's signing identity (private key never committed), [`PLAN.md`](PLAN.md) is the running status/decision log, [`RAILS.md`](RAILS.md) is the marketplace research.
 
 ## API
 
-- `POST /stamp` — `{ "payload": "<string>" }` → signed receipt (the paid call)
-- `POST /verify` — `{ "payload": "<string>", "receipt": {...} }` → `{ valid, reason }` (free)
-- `GET /pubkey` — the public key PEM to verify against (free)
+- `POST /stamp` — `{ "payload": "<string>" }` → signed receipt. Free at the Worker level — this is the ACP-daemon-only internal route (rail A already collected payment via escrow before calling this).
+- `POST /x402/stamp` — same request/response shape as `/stamp`, but requires an x402 payment first (rail B — public, anyone can call this, that's the point).
+- `POST /verify` — `{ "payload": "<string>", "receipt": {...} }` → `{ valid, reason }` (free, both rails)
+- `GET /pubkey` — the public key PEM to verify against (free, both rails)
 
 Receipt shape: `{ hash, timestamp, signature, algo, keyId }` — SHA-256 hash of
 the payload, Ed25519 signature over `{hash, timestamp}`, ISO-8601 timestamp.
@@ -31,11 +34,11 @@ the payload, Ed25519 signature over `{hash, timestamp}`, ISO-8601 timestamp.
 
 - [`src/receiptstamp.js`](src/receiptstamp.js) — core `stamp()`/`verify()` logic (Ed25519 + SHA-256)
 - [`src/server.js`](src/server.js) — Node `http` server, for local dev only
-- [`src/worker.mjs`](src/worker.mjs) — Cloudflare Workers fetch-handler; **deployed, live**
+- [`src/worker.mjs`](src/worker.mjs) — Cloudflare Workers app (Hono); **deployed, live**. Serves `/stamp`, `/x402/stamp`, `/verify`, `/pubkey`
 - [`src/acp-daemon.mjs`](src/acp-daemon.mjs) — ACP marketplace seller daemon (`@virtuals-protocol/acp-node-v2`); **deployed on Railway, live**
 - [`keys/`](keys) — key generation script (`generate-keys.js`); the private key itself is gitignored, never committed
-- [`test/`](test) — test suites for the core logic, the Node server, and the Worker handler
-- [`package.json`](package.json) — one real dependency: `@virtuals-protocol/acp-node-v2` (the daemon's marketplace SDK)
+- [`test/`](test) — test suites for the core logic, the Node server, and the Worker (all 4 routes, both rails)
+- [`package.json`](package.json) — real dependencies: `@virtuals-protocol/acp-node-v2` (rail A's SDK), `hono` + `x402-hono` + `@coinbase/x402` (rail B's paywall + CDP facilitator)
 
 See [PLAN.md](PLAN.md) for the project rationale, kill criterion, and current
 status (this is the file to check for "where are things right now"), and
@@ -66,7 +69,9 @@ below):
 
 ```
 npx wrangler secret put RECEIPTSTAMP_PRIVATE_KEY_PEM   # only if the key ever changes
-npx wrangler deploy                                     # updates the Worker (the /stamp, /verify, /pubkey API)
+npx wrangler secret put CDP_API_KEY_ID                  # from portal.cdp.coinbase.com, needed for /x402/stamp
+npx wrangler secret put CDP_API_KEY_SECRET              # from portal.cdp.coinbase.com, needed for /x402/stamp
+npx wrangler deploy                                     # updates the Worker (all four routes)
 ```
 
 The Railway daemon (the ACP paid-jobs part) redeploys **automatically** any

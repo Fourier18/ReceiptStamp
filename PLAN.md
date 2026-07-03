@@ -110,8 +110,51 @@ attachment doesn't keep this alive past the point the market has answered.
   commands (`acp offering …`) — production job servicing is the cloud daemon.
 - **Kill criterion active: zero paid ACP jobs by 2026-07-16 = kill this rail.**
 
-**Not done — each needs a go-ahead first:**
-- x402 Bazaar listing (needs CDP account + x402 SDK wrapper on the Worker).
-  Near-zero marginal cost — the free second shelf once ACP is proven/failed.
+**x402 Bazaar — LIVE (2026-07-03):**
+- `src/worker.mjs` rewritten on Hono (required — `x402-hono` is Hono
+  middleware, and Bazaar's own docs/Cloudflare's own guide both assume it).
+  Verified against real installed package type definitions, not just docs
+  (`x402-hono`, `@coinbase/x402`, `x402` core — all inspected directly in
+  `node_modules` before writing any code).
+- **Two separate paid routes, deliberately kept apart:** `/stamp` (unchanged,
+  still free at the Worker level — the ACP daemon calls this directly *after*
+  ACP's own escrow already paid; paywalling it would have made the daemon's
+  own calls demand payment from itself and silently broken the live ACP
+  income). `/x402/stamp` (new) — same `stamp()` call, gated by a real x402
+  402-Payment-Required challenge, $0.02 USDC on **Base mainnet**, routed
+  through the **CDP facilitator** (required specifically for Bazaar
+  auto-cataloging — the default `x402.org` facilitator does NOT list on
+  Bazaar). `test/test-worker.js` now asserts both: `/stamp` stays free (200,
+  no payment) AND `/x402/stamp` correctly demands payment (402, correct
+  network/price) — 10/10 worker tests pass, 20/20 total across all suites.
+- **Wallet reused, not new:** `X402_PAY_TO_ADDRESS` is the same ACP agent
+  wallet (`0x7e05d79f914fdac136812af82d304e8272b3dc20`) — no new key custody
+  introduced for this rail.
+- `discoverable: true` plus matching `inputSchema`/`outputSchema`/
+  `description` set on the route config — this is what gets it listed in
+  Bazaar search results once a real payment settles (confirmed from the
+  actual `x402` package's type definitions, not assumed).
+- `wrangler.toml` has `X402_PAY_TO_ADDRESS` as a plain var (safe — it's a
+  receiving address, not a secret).
+
+- CDP account created (personal, not business — the "Verify your business"
+  KYB flow is for custodial products, not needed for a facilitator API key).
+  `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET` set as Worker secrets, IP
+  allowlisting opted out (Workers have no fixed egress IP). Deployed
+  2026-07-03T03:26Z, confirmed live: `/pubkey` 200, `/stamp` still free
+  (200, ACP daemon unaffected), `/x402/stamp` correctly returns 402 with a
+  real payment challenge (`base` network, `20000` = $0.02 USDC, correct
+  live `resource` URL).
+- Bazaar auto-cataloging happens on first *settled* payment (not just a
+  402 challenge) — typically indexed within ~10 minutes after that. Not
+  visible in Bazaar search yet since no real payment has occurred.
+- Gotcha for next time: the CDP dashboard's "Create secret API key" flow
+  asks for an SSN and legal business name if you land on the wrong page —
+  that's the *business/KYB* verification flow (for custodial APIs / holding
+  customer funds), a completely different product from the plain developer
+  API key we needed. If that SSN/business form appears, back out — go to
+  portal.cdp.coinbase.com → API Keys tab directly instead.
+
+**Not done — needs a go-ahead first:**
 - Exchange account for USDC→USD cash-out — only matters once real earnings
-  exist in the wallet.
+  exist in the wallet (applies to both the ACP and x402 rails).

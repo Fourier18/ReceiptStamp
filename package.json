@@ -18,6 +18,8 @@
   "type": "commonjs",
   "homepage": "https://github.com/Fourier18/ReceiptStamp#readme",
   "dependencies": {
-    "@virtuals-protocol/acp-node-v2": "^0.1.7"
+    "@coinbase/x402": "^2.1.0",
+    "@virtuals-protocol/acp-node-v2": "^0.1.7",
+    "x402-hono": "^1.2.0"
   }
 }

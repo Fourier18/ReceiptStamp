@@ -3,10 +3,13 @@ main = "src/worker.mjs"
 compatibility_date = "2026-07-02"
 compatibility_flags = ["nodejs_compat"]
 
-# RECEIPTSTAMP_PUBLIC_KEY_PEM is safe as a plain var (public by definition).
+# RECEIPTSTAMP_PUBLIC_KEY_PEM and X402_PAY_TO_ADDRESS are safe as plain vars
+# (both are meant to be public — a public key and a receiving wallet address).
 [vars]
 RECEIPTSTAMP_PUBLIC_KEY_PEM = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA31U0+J0XDDCIeC0hVXPa2MtOK+kywJwZvaKG9lFclJk=\n-----END PUBLIC KEY-----\n"
+X402_PAY_TO_ADDRESS = "0x7e05d79f914fdac136812af82d304e8272b3dc20"
 
-# RECEIPTSTAMP_PRIVATE_KEY_PEM must be set via:
-#   npx wrangler secret put RECEIPTSTAMP_PRIVATE_KEY_PEM
-# Never put the private key in this file or in [vars].
+# These must be set via `npx wrangler secret put <NAME>`, never in this file:
+#   RECEIPTSTAMP_PRIVATE_KEY_PEM   the notary's Ed25519 signing key
+#   CDP_API_KEY_ID                 from portal.cdp.coinbase.com (x402 Bazaar facilitator)
+#   CDP_API_KEY_SECRET             from portal.cdp.coinbase.com (x402 Bazaar facilitator)
