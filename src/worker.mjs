@@ -138,7 +138,23 @@ async function stampHandler(c) {
   return c.json({ receipt: stamp(payload, c.env.RECEIPTSTAMP_PRIVATE_KEY_PEM, c.env.RECEIPTSTAMP_PUBLIC_KEY_PEM) });
 }
 
+// GET variant — reads payload from a query param instead of a JSON body.
+// Added because Agentic.Market's auto-crawler listed this endpoint as GET;
+// the x402 payment middleware itself already matches any method (route
+// patterns default to verb "*"), so this only needed a Hono GET route.
+async function stampHandlerFromQuery(c) {
+  const payload = c.req.query('payload');
+  if (typeof payload !== 'string' || payload.length === 0) {
+    return c.json({ error: 'query string must include a non-empty "payload" parameter' }, 400);
+  }
+  if (payload.length > 1000000) {
+    return c.json({ error: 'payload too large (1 MB max)' }, 400);
+  }
+  return c.json({ receipt: stamp(payload, c.env.RECEIPTSTAMP_PRIVATE_KEY_PEM, c.env.RECEIPTSTAMP_PUBLIC_KEY_PEM) });
+}
+
 app.post('/x402/stamp', x402PaywallMiddleware, stampHandler);
+app.get('/x402/stamp', x402PaywallMiddleware, stampHandlerFromQuery);
 
 app.notFound((c) => c.json({ error: 'not found. POST /stamp, POST /x402/stamp, POST /verify, GET /pubkey' }, 404));
 app.onError((err, c) => {

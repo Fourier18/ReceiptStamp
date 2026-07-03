@@ -6,8 +6,8 @@ public key can later verify that exact payload existed, unaltered, at that
 exact time — without trusting the agent's own word for it.
 
 Live: https://receiptstamp.panmediatech.workers.dev
-Selling on: [Virtuals ACP](https://app.virtuals.io/acp/agents/019f2535-118d-7d76-a9bf-3ce023c0bffb) — $0.02/receipt, 5-min SLA
-Selling on: x402 Bazaar — $0.02/receipt, Base mainnet (code done; goes live once a CDP account is set up, see [PLAN.md](PLAN.md))
+Selling on: [Virtuals ACP](https://app.virtuals.io/acp/agents/019f2535-118d-7d76-a9bf-3ce023c0bffb) — $0.02/receipt, 5-min SLA — real end-to-end transaction proven 2026-07-03
+Selling on: [x402 Bazaar / Agentic.Market](https://agentic.market/services/receiptstamp-panmediatech-workers-dev) — $0.02/receipt, Base mainnet — real settled payments proven 2026-07-03 (both GET and POST)
 
 ## How this fits together
 
@@ -23,7 +23,7 @@ Everything else supports those: [`test/`](test) proves each piece still works af
 ## API
 
 - `POST /stamp` — `{ "payload": "<string>" }` → signed receipt. Free at the Worker level — this is the ACP-daemon-only internal route (rail A already collected payment via escrow before calling this).
-- `POST /x402/stamp` — same request/response shape as `/stamp`, but requires an x402 payment first (rail B — public, anyone can call this, that's the point).
+- `POST /x402/stamp` or `GET /x402/stamp?payload=...` — same as `/stamp`, but requires an x402 payment first (rail B — public, anyone can call this, that's the point). GET exists specifically because Agentic.Market's crawler listed the endpoint that way; POST was the original.
 - `POST /verify` — `{ "payload": "<string>", "receipt": {...} }` → `{ valid, reason }` (free, both rails)
 - `GET /pubkey` — the public key PEM to verify against (free, both rails)
 

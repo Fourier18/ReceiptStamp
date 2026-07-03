@@ -194,6 +194,93 @@ attachment doesn't keep this alive past the point the market has answered.
   for a scanner with unverified buyer traffic. PayAPI Market and
   awesome-x402 GitHub lists are free/manual alternatives, not yet acted on.
 
+**Confirmed live on Agentic.Market (2026-07-03)** — the public, human-browsable
+side of x402 Bazaar (agentic.market), $51.9M platform-wide payment volume.
+ReceiptStamp's service page: agentic.market/services/receiptstamp-panmediatech-workers-dev,
+showing correct description and $0.02/request pricing. One real bug found here:
+their crawler listed the endpoint as `GET /x402/stamp`, but only `POST` existed
+— a buyer following that listing would have hit a 404. **Fixed** by adding a
+GET variant (`stampHandlerFromQuery` in `worker.mjs`, reads `payload` from a
+query param) alongside the existing POST — purely additive, the POST route
+and its response format are untouched. Confirmed via x402's own route-pattern
+code that the payment middleware already matched any HTTP method (`verb:
+"*"` by default) — only Hono's own router needed the new GET registration.
+`test/test-worker.js` now asserts GET also returns a proper 402 challenge —
+23/23 tests pass across all suites. Deployed and verified live.
+**Real-money verified (2026-07-03):** ran a second real payment through the
+new GET route (query-param payload) using the same bootstrap wallet —
+settled on Base mainnet, tx
+`0xd762d7aa25f55a340d657f06a79c34a22638014bd05a3a109eb4c9757977ed3c`,
+receipt correctly signed and returned. Confirms both HTTP methods work
+end-to-end with real settlement, not just the 402 challenge shape. Also
+noted while reviewing the Agentic.Market listing page: buyers only need
+USDC, not ETH — the facilitator sponsors gas (bootstrap wallet's ETH
+balance was untouched after two real payments, only USDC was spent).
+Reviewed the full listing page (FAQ + "Similar Services") — FAQ content is
+accurate, two cosmetic issues found on Agentic.Market's own display (blank
+network icon, generic/mismatched "what you get back" example JSON) but
+neither is fixable from our side; "Similar Services" shown are unrelated
+services with zero calls each, not real competitive signal either way.
+
+**ACP rail — real end-to-end transaction test, DONE (2026-07-03):**
+- Discovered a **stray duplicate agent** also named "ReceiptStamp"
+  (`019f2534-1efa-7949-ada6-1162998d50a6`, wallet
+  `0x7265812f2a34a680ac1175ea3dadfe8ad1fa035c`), created ~1 minute before
+  the real one, zero offerings, publicly visible (not hidden) — a leftover
+  from earlier agent-creation troubleshooting. Not deleted yet (see below).
+- An agent can't buy its own offering (`acp client create-job` reverted
+  on-chain when provider == buyer's own active agent) — needed a genuinely
+  separate buyer identity. Repurposed the stray duplicate as the test
+  buyer: funded its wallet with 1 USDC (Coinbase → Base), added a signer
+  (`restricted` policy, same browser-approval flow as the real agent's),
+  then ran the full flow as that buyer against the real ReceiptStamp
+  offering: `create-job` → `fund` ($0.02) → **daemon auto-serviced it with
+  zero manual intervention** → `job.submitted` with a correctly signed
+  receipt → `complete` (approved, escrow released) → job status
+  `completed`. Independently re-verified the actual receipt against our
+  own `/verify` endpoint: `valid: true`. This is the full real-money proof
+  that the ACP rail works end-to-end, not just "daemon is online."
+- CLI active agent switched back to the real ReceiptStamp
+  (`019f2535-118d-7d76-a9bf-3ce023c0bffb`) afterward — don't leave it
+  pointed at the test buyer.
+- **Duplicate agent's leftover funds reclaimed (2026-07-03).** Two attempts:
+  1. First tried a raw `acp wallet send-transaction` (manual ERC20
+     `transfer` calldata) from the duplicate's wallet. The outer
+     transaction reported `status: success` on Basescan, but nothing
+     actually moved — a classic ERC-4337 gotcha: a bundled UserOperation's
+     *outer* transaction can succeed even when the *inner* call reverts.
+     Confirmed by decoding the EntryPoint's `UserOperationEvent` log
+     directly (`success: false`), not by trusting the outer receipt.
+     Root cause: the paymaster likely takes a small fee from the same
+     USDC balance being swept, and the transfer tried to send 100% of it,
+     leaving nothing for that fee.
+  2. **Fix: used Virtuals' own dashboard Withdraw UI instead of raw
+     calldata** (app.virtuals.io/profile → Agent Wallets → per-agent
+     Withdraw) — built specifically for this, handles the fee/balance
+     math correctly. Sent 0.981 USDC to Joshua's own connected wallet
+     (`0xb878951d7e70ecc4B792FE202E2063054104642F`). **Confirmed
+     on-chain:** tx
+     `0xd125a126d69e163a877f9ae8af5ab73b8cc12a39f421074b51f3707bd59def52`,
+     duplicate wallet now shows 0 USDC. Lesson for next time: for
+     Privy/ERC-4337 smart-wallet transfers, prefer the dashboard's
+     built-in Withdraw UI over hand-built `send-transaction` calldata —
+     and when checking whether such a transaction really worked, decode
+     the EntryPoint's `UserOperationEvent.success` field, not just the
+     outer transaction's status.
+  - Duplicate agent (`019f2534-1efa-7949-ada6-1162998d50a6`) is now fully
+    drained of funds. Still exists, still has zero offerings, still
+    publicly visible (not hidden) — hiding/deleting it is a small
+    remaining cleanup item, no longer money-at-risk since it's empty.
+- **Money reconciliation note, in case it's confusing later:** the real
+  ReceiptStamp wallet (`0x7e05d79f914fdac136812af82d304e8272b3dc20`) is
+  shared between BOTH rails (it's the ACP agent wallet AND the x402
+  `payTo` address — a deliberate reuse, not drift). Its $0.06 balance
+  after tonight's testing = three separate real $0.02 payments: the x402
+  bootstrap payment, the x402 GET-route test payment, and the ACP test
+  job — not one payment plus some unexplained extra.
+
 **Not done — needs a go-ahead first:**
 - Exchange account for USDC→USD cash-out — only matters once real earnings
   exist in the wallet (applies to both the ACP and x402 rails).
+- Hide/delete the now-empty duplicate agent (`019f2534-1efa-7949-ada6-1162998d50a6`)
+  — low priority, no funds at risk anymore.

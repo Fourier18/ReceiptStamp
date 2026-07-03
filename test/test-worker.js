@@ -66,6 +66,11 @@ async function main() {
   const accepted = x402Challenge.body.accepts && x402Challenge.body.accepts[0];
   assert(accepted && accepted.network === 'base' && accepted.maxAmountRequired === '20000', 'x402 challenge specifies base mainnet and $0.02 USDC (20000 = 6-decimal units)');
 
+  // GET /x402/stamp must also demand payment — added after Agentic.Market's
+  // crawler listed the endpoint as GET; buyers following that listing must work.
+  const x402GetChallenge = await req('GET', '/x402/stamp?payload=' + encodeURIComponent(payload));
+  assert(x402GetChallenge.status === 402 && Array.isArray(x402GetChallenge.body.accepts), 'GET /x402/stamp without payment also returns a 402 challenge');
+
   console.log(failed ? '\nSOME WORKER TESTS FAILED' : '\nALL WORKER TESTS PASSED');
   process.exitCode = failed ? 1 : 0;
 }
