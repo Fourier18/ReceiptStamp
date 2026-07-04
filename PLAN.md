@@ -279,6 +279,36 @@ services with zero calls each, not real competitive signal either way.
   bootstrap payment, the x402 GET-route test payment, and the ACP test
   job — not one payment plus some unexplained extra.
 
+**RECURRING TRAP — the Railway lockfile drift bit us TWICE (2026-07-03):**
+- The `package-lock.json` on this repo has repeatedly gone out of sync in a
+  way that passes locally but fails Railway's strict `npm ci` with
+  `Missing: utf-8-validate@5.0.10 from lock file` (an optional native dep
+  deep in the x402/Solana dependency tree). It happened once during the
+  x402 build, got "fixed," then came back after the bootstrap-script
+  install (`npm install --save-dev x402-fetch viem`) silently rewrote the
+  lockfile incompletely — and only surfaced when a later docs-only push
+  triggered a Railway rebuild.
+- **What is NOT the cause (verified, do not repeat this wrong theory):**
+  `.npmrc`'s `omit=optional` is NOT what makes the lockfile incomplete.
+  Both the broken lockfile and the working fix were produced with
+  `omit=optional` active — it's a constant, not the culprit. The observed
+  difference was *partial* `npm install <pkg>` (leaves it incomplete) vs.
+  a *full* clean regenerate (writes it complete). The exact npm internal
+  reason a partial install does this is not confidently known — don't
+  assert one.
+- **The mechanism-agnostic rule that IS reliable:** `npm ci`'s
+  "Missing from lock file" completeness check is deterministic and
+  platform-independent, so a local `npm ci` pass reliably predicts
+  Railway's Linux build. Therefore: **after ANY command that modifies
+  `package-lock.json` (including a partial `npm install <pkg>`), before
+  pushing, run `rm -rf node_modules && npm ci`. If it errors "Missing
+  from lock file," regenerate fully with
+  `rm -rf node_modules package-lock.json && npm install`, then re-run
+  `npm ci` to confirm, then push.** Do not trust a local dev `npm install`
+  or `npm test` alone to prove the lockfile is Railway-safe.
+- Confirmed fixed and green on Railway's actual Linux build 2026-07-03
+  (commit `336aca1`) — Build stage passed, service Online.
+
 **Not done — needs a go-ahead first:**
 - Exchange account for USDC→USD cash-out — only matters once real earnings
   exist in the wallet (applies to both the ACP and x402 rails).
