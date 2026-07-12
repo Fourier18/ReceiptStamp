@@ -69,7 +69,7 @@ async function readValidatedPayload(c) {
   } catch {
     return { error: c.json({ error: 'invalid JSON body' }, 400) };
   }
-  if (typeof body.payload !== 'string' || body.payload.length === 0) {
+  if (!body || typeof body.payload !== 'string' || body.payload.length === 0) {
     return { error: c.json({ error: 'body must include a non-empty string field "payload"' }, 400) };
   }
   return { payload: body.payload };
@@ -88,7 +88,7 @@ app.post('/verify', async (c) => {
   } catch {
     return c.json({ error: 'invalid JSON body' }, 400);
   }
-  if (typeof body.payload !== 'string' || body.payload.length === 0) {
+  if (!body || typeof body.payload !== 'string' || body.payload.length === 0) {
     return c.json({ error: 'body must include a non-empty string field "payload"' }, 400);
   }
   const r = body.receipt;
@@ -100,11 +100,9 @@ app.post('/verify', async (c) => {
 
 // Internal route for the ACP daemon — deliberately NOT paywalled here.
 // ACP already collected payment via its own escrow before calling this.
-app.post('/stamp', async (c) => {
-  const { payload, error } = await readValidatedPayload(c);
-  if (error) return error;
-  return c.json({ receipt: stamp(payload, c.env.RECEIPTSTAMP_PRIVATE_KEY_PEM, c.env.RECEIPTSTAMP_PUBLIC_KEY_PEM) });
-});
+// Shares stampHandler with the paid POST /x402/stamp route (declared below;
+// function declarations hoist, so referencing it here is safe).
+app.post('/stamp', stampHandler);
 
 // Public, paid route for x402 Bazaar. Facilitator config needs env, which is
 // only available per-request in Workers — so the x402 middleware is built
@@ -120,7 +118,8 @@ async function x402PaywallMiddleware(c, next) {
         price: PRICE_USD,
         network: 'base',
         config: {
-          description: 'Independent proof-of-execution notary: send a payload, get back a signed {hash, timestamp, signature, keyId} receipt provable against the public key at /pubkey.',
+          description:
+            'Signed proof-of-execution notary for AI agents: POST a payload, get hash + timestamp + signature receipt verifiable via /pubkey. Independent attestation for agent jobs and tool outputs. Pay-per-stamp x402 USDC on Base. Not custody, escrow, or delivery verification.',
           inputSchema: STAMP_REQUIREMENT_SCHEMA,
           outputSchema: STAMP_OUTPUT_SCHEMA,
           discoverable: true,
